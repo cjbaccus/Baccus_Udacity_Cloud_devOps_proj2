@@ -1,175 +1,289 @@
+Description: >
+  Carl Baccus - Udacity Cloud DevOps class 
+  This file will build the Infrastructure as Code for the Project 2.
 Parameters:
-    EnvName:
-        Description: An environment name that will be prefixed to resource names
-        Type: String
-
-    VPCrange: 
-        Description: This will be the complete CIDR range for the VPC (/16 is 65k ip addresses total)
-        Type: String
-        Default: 10.0.0.0/16
-
-    PubSub1:
-        Description: This is our first public subnet in CIDR format with /24 and 253 ip addresses available in first AvailabilityZone
-        Type: String
-        Default: 10.0.0.0/24
-
-    PubSub2:
-        Description: This is our second public subnet in CIDR format with /24 and 253 ip addresses available in second AvailabilityZone
-        Type: String
-        Default: 10.0.1.0/24
-
-    PrivSub1:
-        Description: This is our first private subnet in CIDR format /24 with 253 available in first AvailabilityZone
-        Type: String
-        Default: 10.0.2.0/24
-
-    PrivSub2:
-        Description: This is our second private subnet in CIDR format /24 with 253 available in second AvailabilityZone
-        Type: String
-        Default: 10.0.3.0/24
-
-    AMItoUse:
-        Description: This is the AMI image to AMItoUse
-        Type: String
-        Default: ami-0e4d932065378fd3d
-
+  EnvName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  VPCCIDRnotation: 
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+  PubSub1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.0.0/24
+  PubSub2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.1.0/24
+  PrivSub1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.2.0/24
+  PrivSub2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.3.0/24
 Resources:
-
   VPC: 
     Type: AWS::EC2::VPC
     Properties:
-        CidrBlock: !Ref VPCrange
-        EnableDnsHostnames: true
-        Tags: 
-            - Key: Name 
-              Value: !Ref EnvName
-        
+      CidrBlock: !Ref VPCCIDRnotation
+      EnableDnsHostnames: true
+      Tags: 
+        - Key: Name 
+          Value: !Ref EnvName
   InternetGateway:
-      Type: AWS::EC2::InternetGateway
-      Properties:
-          Tags:
-              - Key: Name
-                Value: !Ref EnvName
-          
-  InternetGatewayAttachment:
-      Type: AWS::EC2::VPCGatewayAttachment
-      Properties:
-          InternetGatewayId: !Ref InternetGateway
-          VpcId: !Ref VPC
-  
-  
-  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
-  RoleForSSMAccess: 
-    Type: "AWS::IAM::Role"
+    Type: AWS::EC2::InternetGateway
     Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - ec2.amazonaws.com
-            Action:
-              - 'sts:AssumeRole'
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-
-# Instance Profile
-  ServerInstanceProfile: 
-    Type: "AWS::IAM::InstanceProfile"
+      Tags:
+        - Key: Name
+          Value: !Ref EnvName
+  
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+  PubSub1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PubSub1CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Public Subnet (AZ1)
+  PubSub2: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PubSub2CIDR
+      MapPublicIpOnLaunch: true
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Public Subnet (AZ2)
+  PrivSub1: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PrivSub1CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Private Subnet (AZ1)
+  PrivSub2: 
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+      CidrBlock: !Ref PrivSub2CIDR
+      MapPublicIpOnLaunch: false
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Private Subnet (AZ2)
+  NatGW1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
     Properties: 
-      Roles: 
-        - !Ref RoleForSSMAccess
-# Security Group
-  WebAccessSecurityGroup:
+      Domain: vpc
+  NatGW2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+  NatGW1: 
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt NatGW1EIP.AllocationId
+      SubnetId: !Ref PubSub1
+  NatGW2: 
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGW2EIP.AllocationId
+      SubnetId: !Ref PubSub2
+  PubRtTble:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+      - Key: Name 
+        Value: !Sub ${EnvName} Public Routes
+  DefPubRt: 
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties: 
+      RouteTableId: !Ref PubRtTble
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSub1RTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PubRtTble
+      SubnetId: !Ref PubSub1
+  PublicSub2RTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PubRtTble
+      SubnetId: !Ref PubSub2
+  PrivRT1:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Private Routes (AZ1)
+  DefPrivRT1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivRT1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGW1
+  PrivateSub1RTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivRT1
+      SubnetId: !Ref PrivSub1
+  PrivRTTble2:
+    Type: AWS::EC2::RouteTable
+    Properties: 
+      VpcId: !Ref VPC
+      Tags: 
+        - Key: Name 
+          Value: !Sub ${EnvName} Private Routes (AZ2)
+  DefPrivRT2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivRTTble2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGW2
+  PrivateSub2RTTbleAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivRTTble2
+      SubnetId: !Ref PrivSub2
+  LoadBalanceSecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
-        GroupDescription: Allow http to our test host
-        VpcId:
-          Ref: VPC
-        SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-        SecurityGroupEgress:
-        - IpProtocol: -1
-          FromPort: -1
-          ToPort: -1
-          CidrIp: 0.0.0.0/0
-# Server EC2 Instance
-  ServerInstance: 
-    Type: AWS::EC2::Instance
+      GroupDescription: Allow http to our load balancer
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0
+  WebServSecGrp:
+    Type: AWS::EC2::SecurityGroup
     Properties:
-      InstanceType: t3.micro
-      ImageId: !Ref AMItoUse
-      IamInstanceProfile: !Ref ServerInstanceProfile
-      NetworkInterfaces: 
-        - AssociatePublicIpAddress: "true"
-          DeviceIndex: "0"
-          GroupSet: 
-            - Ref: "WebAccessSecurityGroup"
-          # SubnetId: 
-          #   Ref: "SubnetForServer"
-
+      GroupDescription: Allow http to our hosts and SSH from local only
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 8080
+        ToPort: 8080
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
+  ProfileRoles:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - ami-0aeeebd8d2ab47354
+  WebAppLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          apt-get update -y
+          apt-get install unzip awscli -y
+          apt-get install apache2 -y
+          systemctl start apache2.service
+          cd /var/www/html
+          aws s3 cp s3://udacity-demo-1/udacity.zip .
+          unzip -o udacity.zip
+      ImageId: ami-0747bdcabd34c712a
+      IamInstanceProfile: !Ref ProfileRoles
+      SecurityGroups:
+      - Ref: WebServSecGrp
+      InstanceType: t2.medium
+      BlockDeviceMappings: 
+      - DeviceName: "/dev/sdk"
+        Ebs:
+          VolumeSize: "10"
+  WebAppGroup:             
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PrivSub1
+        - !Ref PrivSub2
+      LaunchConfigurationName:
+        Ref: WebAppLaunchConfig
+      MinSize: '4'
+      MaxSize: '6'
+      TargetGroupARNs:
+      - Ref: WebAppTargetGroup
+  WebAppLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref PrivSub1
+        - !Ref PrivSub2
+      SecurityGroups:
+      - Ref: LoadBalanceSecGrp
+  Listener:            
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: WebAppTargetGroup
+      LoadBalancerArn:
+        Ref: WebAppLoadBalancer
+      Port: '80'
+      Protocol: HTTP
+  MyLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref 'WebAppTargetGroup'
+      Conditions:
+      - Field: path-pattern
+        Values: [/]
+      ListenerArn: !Ref 'Listener'
+      Priority: 1
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VPC
 Outputs: 
-
-    VPC: 
-        Description: A reference to the created VPC
-        Value: !Ref VPC
-        Export:
-          Name: !Sub ${EnvName}-VPCID
-
-    # VPCPublicRouteTable:
-    #     Description: Public Routing
-    #     Value: !Ref PublicRouteTable
-    #     Export:
-    #       Name: !Sub ${EnvName}-PUB-RT
-
-    # VPCPrivateRouteTable1:
-    #     Description: Private Routing AZ1
-    #     Value: !Ref PrivateRouteTable1
-    #     Export:
-    #       Name: !Sub ${EnvirEnvNameonmentName}-PRI1-RT
-
-    # VPCPrivateRouteTable2:
-    #     Description: Private Routing AZ2
-    #     Value: !Ref PrivateRouteTable2
-    #     Export:
-    #       Name: !Sub ${EnvName}-PRI2-RT
-
-    PublicSubnets:
-        Description: A list of the public subnets
-        Value: !Join [ ",", [ !Ref PubSub1, !Ref PubSub2 ]]
-        Export:
-          Name: !Sub ${EnvName}-PUB-NETS
-
-    PrivateSubnets:
-        Description: A list of the private subnets
-        Value: !Join [ ",", [ !Ref PrivSub1, !Ref PrivSub2 ]]
-        Export:
-          Name: !Sub ${EnvName}-PRIV-NETS
-
-    PublicSubnet1:
-        Description: A reference to the public subnet in the 1st Availability Zone
-        Value: !Ref PubSub1
-        Export:
-          Name: !Sub ${EnvName}-PUB1-SN
-
-    PublicSubnet2: 
-        Description: A reference to the public subnet in the 2nd Availability Zone
-        Value: !Ref PubSub2
-        Export:
-          Name: !Sub ${EnvName}-PUB2-SN
-
-    PrivateSubnet1:
-        Description: A reference to the private subnet in the 1st Availability Zone
-        Value: !Ref PrivSub1
-        Export:
-          Name: !Sub ${EnvName}-PRI1-SN
-
-    PrivateSubnet2: 
-        Description: A reference to the private subnet in the 2nd Availability Zone
-        Value: !Ref PrivSub2
-        Export:
-          Name: !Sub ${EnvName}-PRI2-SN 
+  AppLoadBalancer: 
+    Description: A reference to the created Application Load Balancer
+    Value: !Join ["", [ "http://", !Ref WebAppLoadBalancer ]]
+    Export:
+      Name: !Sub ${EnvName}-AppLB-Id
