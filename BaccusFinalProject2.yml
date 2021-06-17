@@ -85,8 +85,8 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
         GroupDescription: Allow http to our test host
-        VpcId: !Ref VPC
-          # Ref: VPC
+        VpcId:
+          Ref: VPC
         SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
