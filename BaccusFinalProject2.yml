@@ -34,6 +34,7 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Ref EnvName
+
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
@@ -46,6 +47,7 @@ Resources:
     Properties:
       InternetGatewayId: !Ref InternetGateway
       VpcId: !Ref VPC
+
   PubSub1: 
     Type: AWS::EC2::Subnet
     Properties:
@@ -56,6 +58,7 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Public Subnet (AZ1)
+
   PubSub2: 
     Type: AWS::EC2::Subnet
     Properties:
@@ -66,6 +69,7 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Public Subnet (AZ2)
+
   PrivSub1: 
     Type: AWS::EC2::Subnet
     Properties:
@@ -76,6 +80,7 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Private Subnet (AZ1)
+
   PrivSub2: 
     Type: AWS::EC2::Subnet
     Properties:
@@ -86,26 +91,31 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Private Subnet (AZ2)
+
   NatGW1EIP:
     Type: AWS::EC2::EIP
     DependsOn: InternetGatewayAttachment
     Properties: 
       Domain: vpc
+
   NatGW2EIP:
     Type: AWS::EC2::EIP
     DependsOn: InternetGatewayAttachment
     Properties:
       Domain: vpc
+
   NatGW1: 
     Type: AWS::EC2::NatGateway
     Properties: 
       AllocationId: !GetAtt NatGW1EIP.AllocationId
       SubnetId: !Ref PubSub1
+
   NatGW2: 
     Type: AWS::EC2::NatGateway
     Properties:
       AllocationId: !GetAtt NatGW2EIP.AllocationId
       SubnetId: !Ref PubSub2
+
   PubRtTble:
     Type: AWS::EC2::RouteTable
     Properties: 
@@ -113,6 +123,7 @@ Resources:
       Tags: 
       - Key: Name 
         Value: !Sub ${EnvName} Public Routes
+
   DefPubRt: 
     Type: AWS::EC2::Route
     DependsOn: InternetGatewayAttachment
@@ -120,16 +131,19 @@ Resources:
       RouteTableId: !Ref PubRtTble
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
+
   PublicSub1RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PubRtTble
       SubnetId: !Ref PubSub1
+
   PublicSub2RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PubRtTble
       SubnetId: !Ref PubSub2
+
   PrivRT1:
     Type: AWS::EC2::RouteTable
     Properties: 
@@ -137,17 +151,20 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Private Routes (AZ1)
+
   DefPrivRT1:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivRT1
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGW1
+
   PrivateSub1RTAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PrivRT1
       SubnetId: !Ref PrivSub1
+
   PrivRTTble2:
     Type: AWS::EC2::RouteTable
     Properties: 
@@ -155,17 +172,20 @@ Resources:
       Tags: 
         - Key: Name 
           Value: !Sub ${EnvName} Private Routes (AZ2)
+
   DefPrivRT2:
     Type: AWS::EC2::Route
     Properties:
       RouteTableId: !Ref PrivRTTble2
       DestinationCidrBlock: 0.0.0.0/0
       NatGatewayId: !Ref NatGW2
+
   PrivateSub2RTTbleAssoc:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       RouteTableId: !Ref PrivRTTble2
       SubnetId: !Ref PrivSub2
+
   LoadBalanceSecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -181,30 +201,33 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
+
   WebServSecGrp:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow http to our hosts and SSH from local only
+      GroupDescription: Allow http to our hosts 
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 8080
-        ToPort: 8080
+        FromPort: 80
+        ToPort: 80
         CidrIp: 0.0.0.0/0
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: 0.0.0.0/0
+      # - IpProtocol: tcp
+      #   FromPort: 22
+      #   ToPort: 22
+      #   CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
       - IpProtocol: tcp
         FromPort: 0
         ToPort: 65535
         CidrIp: 0.0.0.0/0
+
   ProfileRoles:
     Type: AWS::IAM::InstanceProfile
     Properties: 
       Roles:
         - ami-0aeeebd8d2ab47354
+
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -227,26 +250,29 @@ Resources:
       - DeviceName: "/dev/sdk"
         Ebs:
           VolumeSize: "10"
+
   WebAppGroup:             
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier:
-        - !Ref PrivSub1
-        - !Ref PrivSub2
+        - !Ref PubSub1
+        - !Ref PubSub2
       LaunchConfigurationName:
         Ref: WebAppLaunchConfig
       MinSize: '4'
       MaxSize: '6'
       TargetGroupARNs:
       - Ref: WebAppTargetGroup
+      
   WebAppLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Subnets:
-        - !Ref PrivSub1
-        - !Ref PrivSub2
+        - !Ref PubSub1
+        - !Ref PubSub2
       SecurityGroups:
       - Ref: LoadBalanceSecGrp
+
   Listener:            
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -258,6 +284,7 @@ Resources:
         Ref: WebAppLoadBalancer
       Port: '80'
       Protocol: HTTP
+
   MyLoadBalancerListener:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -269,6 +296,7 @@ Resources:
         Values: [/]
       ListenerArn: !Ref 'Listener'
       Priority: 1
+
   WebAppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -281,9 +309,26 @@ Resources:
       Protocol: HTTP
       UnhealthyThresholdCount: 5
       VpcId: !Ref VPC
+
+# my outputs
 Outputs: 
   AppLoadBalancer: 
     Description: A reference to the created Application Load Balancer
     Value: !Join ["", [ "http://", !Ref WebAppLoadBalancer ]]
     Export:
       Name: !Sub ${EnvName}-AppLB-Id
+  
+  MyLoadBalancerListener1:
+    Description: A reference to the listener address of the load balancer.
+    Value: !Join ["", [ "http://", !Ref MyLoadBalancerListener ]]
+    Export:
+      Name: !Sub ${EnvName}-App-LoadBalance-Listenter
+
+  MyWebApplicationGroup:
+    Description: A reference to the WebAppGroup
+    Value: !Join ["", [ "http://", !Ref WebAppGroup ]]
+    Export:
+      Name: !Sub ${EnvName}-WebAppGroup
+
+  
+
