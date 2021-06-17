@@ -1,0 +1,30 @@
+[
+	{
+		"ParameterKey": "EnvName",
+		"ParameterValue": "UdacityP2"
+	},
+	{
+		"ParameterKey": "VPCrange",
+		"ParameterValue": "172.18.0.0/16"
+	},
+	{
+		"ParameterKey": "PubSub1",
+		"ParameterValue": "172.18.0.0/24"
+	},
+	{
+		"ParameterKey": "PubSub2",
+		"ParameterValue": "172.18.1.0/24"
+	},
+	{
+		"ParameterKey": "PrivSub1",
+		"ParameterValue": "172.18.2.0/24"
+	},
+	{
+		"ParameterKey": "PrivSub2",
+		"ParameterValue": "172.18.3.0/24"
+	},
+	{
+        "ParameterKey": "AMItoUse",
+        "ParameterValue": "ami-0e4d932065378fd3d"
+	}
+]

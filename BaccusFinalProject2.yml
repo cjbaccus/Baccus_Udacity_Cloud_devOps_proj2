@@ -1,0 +1,175 @@
+Parameters:
+    EnvName:
+        Description: An environment name that will be prefixed to resource names
+        Type: String
+
+    VPCrange: 
+        Description: This will be the complete CIDR range for the VPC (/16 is 65k ip addresses total)
+        Type: String
+        Default: 10.0.0.0/16
+
+    PubSub1:
+        Description: This is our first public subnet in CIDR format with /24 and 253 ip addresses available in first AvailabilityZone
+        Type: String
+        Default: 10.0.0.0/24
+
+    PubSub2:
+        Description: This is our second public subnet in CIDR format with /24 and 253 ip addresses available in second AvailabilityZone
+        Type: String
+        Default: 10.0.1.0/24
+
+    PrivSub1:
+        Description: This is our first private subnet in CIDR format /24 with 253 available in first AvailabilityZone
+        Type: String
+        Default: 10.0.2.0/24
+
+    PrivSub2:
+        Description: This is our second private subnet in CIDR format /24 with 253 available in second AvailabilityZone
+        Type: String
+        Default: 10.0.3.0/24
+
+    AMItoUse:
+        Description: This is the AMI image to AMItoUse
+        Type: String
+        Default: ami-0e4d932065378fd3d
+
+Resources:
+
+  VPC: 
+    Type: AWS::EC2::VPC
+    Properties:
+        CidrBlock: !Ref VPCrange
+        EnableDnsHostnames: true
+        Tags: 
+            - Key: Name 
+              Value: !Ref EnvName
+        
+  InternetGateway:
+      Type: AWS::EC2::InternetGateway
+      Properties:
+          Tags:
+              - Key: Name
+                Value: !Ref EnvName
+          
+  InternetGatewayAttachment:
+      Type: AWS::EC2::VPCGatewayAttachment
+      Properties:
+          InternetGatewayId: !Ref InternetGateway
+          VpcId: !Ref VPC
+  
+  
+  #instace profile contains the IAM Role name(s) that we want to associate to our auto scaling EC2 Servers
+  RoleForSSMAccess: 
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+# Instance Profile
+  ServerInstanceProfile: 
+    Type: "AWS::IAM::InstanceProfile"
+    Properties: 
+      Roles: 
+        - !Ref RoleForSSMAccess
+# Security Group
+  WebAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http to our test host
+        VpcId: !Ref VPC
+          # Ref: VPC
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: -1
+          FromPort: -1
+          ToPort: -1
+          CidrIp: 0.0.0.0/0
+# Server EC2 Instance
+  ServerInstance: 
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: !Ref AMItoUse
+      IamInstanceProfile: !Ref ServerInstanceProfile
+      NetworkInterfaces: 
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          GroupSet: 
+            - Ref: "WebAccessSecurityGroup"
+          # SubnetId: 
+          #   Ref: "SubnetForServer"
+
+Outputs: 
+
+    VPC: 
+        Description: A reference to the created VPC
+        Value: !Ref VPC
+        Export:
+          Name: !Sub ${EnvName}-VPCID
+
+    # VPCPublicRouteTable:
+    #     Description: Public Routing
+    #     Value: !Ref PublicRouteTable
+    #     Export:
+    #       Name: !Sub ${EnvName}-PUB-RT
+
+    # VPCPrivateRouteTable1:
+    #     Description: Private Routing AZ1
+    #     Value: !Ref PrivateRouteTable1
+    #     Export:
+    #       Name: !Sub ${EnvirEnvNameonmentName}-PRI1-RT
+
+    # VPCPrivateRouteTable2:
+    #     Description: Private Routing AZ2
+    #     Value: !Ref PrivateRouteTable2
+    #     Export:
+    #       Name: !Sub ${EnvName}-PRI2-RT
+
+    PublicSubnets:
+        Description: A list of the public subnets
+        Value: !Join [ ",", [ !Ref PubSub1, !Ref PubSub2 ]]
+        Export:
+          Name: !Sub ${EnvName}-PUB-NETS
+
+    PrivateSubnets:
+        Description: A list of the private subnets
+        Value: !Join [ ",", [ !Ref PrivSub1, !Ref PrivSub2 ]]
+        Export:
+          Name: !Sub ${EnvName}-PRIV-NETS
+
+    PublicSubnet1:
+        Description: A reference to the public subnet in the 1st Availability Zone
+        Value: !Ref PubSub1
+        Export:
+          Name: !Sub ${EnvName}-PUB1-SN
+
+    PublicSubnet2: 
+        Description: A reference to the public subnet in the 2nd Availability Zone
+        Value: !Ref PubSub2
+        Export:
+          Name: !Sub ${EnvName}-PUB2-SN
+
+    PrivateSubnet1:
+        Description: A reference to the private subnet in the 1st Availability Zone
+        Value: !Ref PrivSub1
+        Export:
+          Name: !Sub ${EnvName}-PRI1-SN
+
+    PrivateSubnet2: 
+        Description: A reference to the private subnet in the 2nd Availability Zone
+        Value: !Ref PrivSub2
+        Export:
+          Name: !Sub ${EnvName}-PRI2-SN 
