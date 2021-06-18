@@ -227,7 +227,7 @@ Resources:
     Properties: 
       Roles:
         - ami-0aeeebd8d2ab47354
-
+  
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
@@ -330,5 +330,14 @@ Outputs:
     Export:
       Name: !Sub ${EnvName}-WebAppGroup
 
-  
+  URL:
+    Description: URL
+    Value:
+      Fn::Join:
+      - ''
+      - - http://
+        - Fn::GetAtt:
+          - WebAppLoadBalancer  
+          - DNSName
 
+  
